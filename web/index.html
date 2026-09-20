@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Data Quality Tool</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', system-ui, sans-serif; }
+    body {
+      background: #0f0d15;
+      color: #e0def4;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 24px;
+      user-select: none;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .header h1 { font-size: 22px; font-weight: 600; color: #f5c2e7; letter-spacing: 0.5px; }
+
+    .upload-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      border-radius: 14px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .file-info { font-size: 14px; color: #9a8fae; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px; }
+
+    .btn-group { display: flex; gap: 10px; }
+
+    .btn-select {
+      background: #9ccfd8;
+      color: #11111b;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-select:hover { background: #c4a7e7; transform: translateY(-1px); }
+
+    .btn-quick-clean {
+      background: rgba(137, 180, 250, 0.15);
+      color: #89b4fa;
+      border: 1px solid rgba(137, 180, 250, 0.3);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-quick-clean:hover { background: rgba(137, 180, 250, 0.25); transform: translateY(-1px); }
+    .btn-quick-clean:disabled { opacity: 0.5; cursor: default; transform: none; }
+
+    .btn-clean {
+      background: rgba(166, 227, 161, 0.15);
+      color: #a6e3a1;
+      border: 1px solid rgba(166, 227, 161, 0.3);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-clean:hover { background: rgba(166, 227, 161, 0.25); transform: translateY(-1px); }
+
+    .btn-reset {
+      background: rgba(255, 255, 255, 0.06);
+      color: #e0def4;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-reset:hover {
+      background: rgba(243, 139, 168, 0.2);
+      color: #f38ba8;
+      border-color: rgba(243, 139, 168, 0.4);
+    }
+
+    .status-bar {
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+      color: #9a8fae;
+      transition: all 0.3s ease;
+    }
+    .status-clean { background: rgba(166, 227, 161, 0.15); color: #a6e3a1; border: 1px solid rgba(166, 227, 161, 0.3); }
+    .status-error { background: rgba(243, 139, 168, 0.15); color: #f38ba8; border: 1px solid rgba(243, 139, 168, 0.3); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .metric-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .metric-card:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.15);
+    }
+    .metric-card.active {
+      background: rgba(137, 180, 250, 0.12);
+      border-color: rgba(137, 180, 250, 0.4);
+    }
+    .metric-card.disabled {
+      cursor: default;
+      opacity: 0.6;
+    }
+    .metric-card.disabled:hover {
+      background: rgba(255,255,255,0.02);
+      border-color: rgba(255,255,255,0.05);
+    }
+
+    .metric-title { font-size: 13px; color: #9a8fae; margin-bottom: 6px; }
+    .metric-value { font-size: 20px; font-weight: 700; color: #e0def4; }
+    .has-issues { color: #f38ba8; }
+    .no-issues { color: #a6e3a1; }
+
+    /* Modal & Panel Styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal-box {
+      background: #181622;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      width: 720px;
+      max-width: 92vw;
+      max-height: 86vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h2 { font-size: 16px; color: #f5c2e7; }
+    .modal-close { cursor: pointer; color: #a6adc8; font-size: 22px; background: none; border: none; }
+
+    .mode-switch { display: flex; gap: 10px; padding: 14px 20px; }
+    .mode-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.03);
+      color: #cdd6f4;
+      cursor: pointer;
+      font-size: 12px;
+      text-align: left;
+      transition: all 0.2s ease;
+    }
+    .mode-btn b { display: block; font-size: 13px; margin-bottom: 4px; color: #f5c2e7; }
+    .mode-btn.active { border-color: #89b4fa; background: rgba(137,180,250,0.12); }
+
+    .modal-body { padding: 0 20px 16px; overflow-y: auto; flex-grow: 1; }
+    .rule-group { margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; background: rgba(255,255,255,0.01); }
+    .rule-group-title { font-size: 12px; color: #89b4fa; margin-bottom: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .rule-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .rule-row:last-child { border-bottom: none; }
+    .rule-row select {
+      background: #14141c; color: #cdd6f4; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px; padding: 5px 8px; font-size: 12px; outline: none;
+    }
+    .rule-note { color: #6c7086; font-size: 11px; }
+
+    .modal-footer {
+      padding: 14px 20px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .btn-apply {
+      background: #89b4fa; color: #11111b; border: none; padding: 10px 18px;
+      border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer;
+    }
+    .btn-apply:hover { background: #b4befe; }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06); color: #cdd6f4; border: 1px solid rgba(255,255,255,0.12);
+      padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+
+    .log-panel {
+      margin-top: 20px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 14px;
+      display: none;
+    }
+    .log-panel.open { display: block; }
+    .log-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .log-panel-header span { font-size: 13px; color: #a6adc8; font-weight: 600; }
+    .log-list { max-height: 180px; overflow-y: auto; font-size: 11px; color: #a6adc8; font-family: monospace; background: #121019; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); }
+    .log-list div { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+
+    .save-menu { position: relative; display: inline-block; }
+    .save-dropdown {
+      display: none;
+      position: absolute;
+      bottom: 110%;
+      right: 0;
+      background: #1a1a24;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      overflow: hidden;
+      min-width: 130px;
+      z-index: 5;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+    }
+    .save-dropdown.open { display: block; }
+    .save-dropdown div {
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #cdd6f4;
+    }
+    .save-dropdown div:hover { background: rgba(255,255,255,0.08); }
+
+    /* Table styles */
+    .table-wrap {
+      margin-top: 10px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .table-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      gap: 10px;
+    }
+    .toolbar-left { display: flex; gap: 10px; align-items: center; }
+    .table-toolbar span { font-size: 13px; color: #9a8fae; }
+    .btn-toggle {
+      background: rgba(255,255,255,0.06);
+      color: #e0def4;
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-toggle.active {
+      background: rgba(243, 139, 168, 0.2);
+      color: #f38ba8;
+      border-color: rgba(243, 139, 168, 0.4);
+    }
+    .btn-copy {
+      background: rgba(196, 167, 231, 0.15);
+      color: #c4a7e7;
+      border: 1px solid rgba(196, 167, 231, 0.3);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-copy:hover { background: rgba(196, 167, 231, 0.25); }
+    .btn-copy.copied { background: rgba(166, 227, 161, 0.2); color: #a6e3a1; border-color: rgba(166,227,161,0.4); }
+
+    .table-container {
+      max-height: 420px;
+      overflow: auto;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: #14121c;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+      user-select: text;
+    }
+
+    table.data-table thead tr.row-letters th {
+      position: sticky; top: 0; z-index: 4; background: #14121c;
+      color: #6e6a86; text-align: center; font-weight: 500; font-size: 11px;
+      padding: 6px 10px; height: 25px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    table.data-table thead tr.row-headers th {
+      position: sticky; top: 25px; z-index: 3; background: #231d32;
+      color: #f5c2e7; text-align: left; padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    table.data-table tbody tr:nth-child(odd) { background: #161321; }
+    table.data-table tbody tr:nth-child(even) { background: #1c182b; }
+
+    table.data-table td {
+      padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: #e0def4; white-space: nowrap;
+    }
+    table.data-table tr.error-row td { background: rgba(243, 139, 168, 0.08); }
+    table.data-table td.error-cell {
+      background: rgba(243, 139, 168, 0.25) !important;
+      color: #f38ba8 !important; font-weight: 600; cursor: help; position: relative;
+    }
+
+    table.data-table th.corner { position: sticky; left: 0; top: 0; z-index: 5; background: #14121c; }
+
+    table.data-table td.row-num,
+    table.data-table thead tr.row-headers th.row-num-header {
+      position: sticky; left: 0; background: #1d182b; color: #8e82a3;
+      text-align: center; font-weight: 600; font-size: 11px; z-index: 2;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    table.data-table thead tr.row-headers th.row-num-header { z-index: 3; }
+
+    table.data-table td.error-cell[data-tooltip]:hover::after {
+      content: attr(data-tooltip); position: absolute; left: 0; top: 100%;
+      margin-top: 4px; background: #1f1d2e; color: #f5c2e7;
+      border: 1px solid rgba(243, 139, 168, 0.4); padding: 8px 10px;
+      border-radius: 8px; font-size: 12px; font-weight: 400; white-space: normal;
+      width: 260px; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5); line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Data Quality Checker</h1>
+  </div>
+
+  <div class="upload-card">
+    <span class="file-info" id="fileName">No file selected</span>
+    <div class="btn-group">
+      <button class="btn-select" onclick="selectFile()">Select File</button>
+      <button class="btn-quick-clean" id="quickCleanBtn" onclick="runQuickClean()" style="display:none;">Quick Clean</button>
+      <button class="btn-clean" id="cleanBtn" onclick="openCleanModal()" style="display:none;">Configure Cleaning</button>
+      <button class="btn-reset" onclick="resetUI()">Reset</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar">WAITING FOR FILE</div>
+
+  <div class="grid">
+    <div class="metric-card disabled">
+      <div class="metric-title">Total Rows</div><div class="metric-value" id="total_rows">-</div>
+    </div>
+    <div class="metric-card disabled">
+      <div class="metric-title">Total Columns</div><div class="metric-value" id="total_cols">-</div>
+    </div>
+    <div class="metric-card" data-category="missing" onclick="filterByCategory('missing')">
+      <div class="metric-title">Missing Cells</div><div class="metric-value" id="total_missing">-</div>
+    </div>
+    <div class="metric-card" data-category="duplicate_row" onclick="filterByCategory('duplicate_row')">
+      <div class="metric-title">Duplicate Rows</div><div class="metric-value" id="duplicate_rows">-</div>
+    </div>
+    <div class="metric-card" data-category="invalid_date" onclick="filterByCategory('invalid_date')">
+      <div class="metric-title">Invalid Dates</div><div class="metric-value" id="invalid_dates">-</div>
+    </div>
+    <div class="metric-card" data-category="logical_date" onclick="filterByCategory('logical_date')">
+      <div class="metric-title">Date Logic Errors</div><div class="metric-value" id="logical_date_errors">-</div>
+    </div>
+    <div class="metric-card" data-category="negative" onclick="filterByCategory('negative')">
+      <div class="metric-title">Negative Values</div><div class="metric-value" id="negative_values">-</div>
+    </div>
+    <div class="metric-card" data-category="outlier" onclick="filterByCategory('outlier')">
+      <div class="metric-title">Outliers</div><div class="metric-value" id="potential_outliers">-</div>
+    </div>
+  </div>
+
+  <div class="table-wrap" id="tableWrap" style="display:none;">
+    <div class="table-toolbar">
+      <div class="toolbar-left">
+        <span id="tableInfo"></span>
+        <button class="btn-toggle" id="errorsOnlyBtn" onclick="toggleErrorsOnly()">Errors Only</button>
+      </div>
+      <button class="btn-copy" id="copyBtn" onclick="copyTable()">Copy Table</button>
+    </div>
+    <div class="table-container">
+      <table class="data-table" id="dataTable"></table>
+    </div>
+  </div>
+
+  <div class="log-panel" id="logPanel">
+    <div class="log-panel-header">
+      <span id="logSummary"></span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-secondary" onclick="undoClean()">Undo Cleaning</button>
+        <button class="btn-secondary" onclick="saveLog()">Download Log</button>
+        <div class="save-menu">
+          <button class="btn-apply" onclick="toggleSaveMenu()">Save File</button>
+          <div class="save-dropdown" id="saveDropdown">
+            <div onclick="saveCleaned('csv')">CSV</div>
+            <div onclick="saveCleaned('xlsx')">Excel (.xlsx)</div>
+            <div onclick="saveCleaned('json')">JSON</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="log-list" id="logList"></div>
+  </div>
+
+  <div class="modal-overlay" id="cleanModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Data Cleaning</h2>
+        <button class="modal-close" onclick="closeCleanModal()">×</button>
+      </div>
+      <div class="mode-switch">
+        <button class="mode-btn active" id="modeSimpleBtn" onclick="switchMode('simple')">
+          <b>Simple Cleaning</b>
+          Uniform rules by error type across the entire file. Fast and predictable.
+        </button>
+        <button class="mode-btn" id="modeSmartBtn" onclick="switchMode('smart')">
+          <b>Advanced Cleaning</b>
+          Contextual missing value imputation (median by related category). More accurate, but slower.
+        </button>
+      </div>
+      <div class="modal-body" id="cleanRulesBody"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeCleanModal()">Cancel</button>
+        <button class="btn-apply" onclick="applyClean()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentTableData = null;
+    let errorsOnlyMode = false;
+    let activeCategory = null;
+    let cleanMode = 'simple';
+    let cleanConfig = null;
+    let currentLog = [];
+
+    const MISSING_NUM_OPTIONS = [
+      ["zero", "0"], ["mean", "Mean"], ["median", "Median"],
+      ["drop_row", "Delete Row"], ["skip", "Do Not Touch"]
+    ];
+    const MISSING_TEXT_OPTIONS = [
+      ["unknown_text", "\"N/A\""], ["mode", "Mode"],
+      ["drop_row", "Delete Row"], ["skip", "Do Not Touch"]
+    ];
+    const OUTLIER_OPTIONS = [
+      ["clip", "Clip to IQR"], ["to_nan", "To NaN"],
+      ["drop_row", "Delete Row"], ["flag", "Flag"], ["skip", "Do Not Touch"]
+    ];
+    const NEGATIVE_OPTIONS = [
+      ["abs", "Absolute abs()"], ["zero", "Replace with 0"], ["to_nan", "To NaN"],
+      ["drop_row", "Delete Row"], ["skip", "Do Not Touch"]
+    ];
+    const DUP_OPTIONS = [
+      ["keep_first", "Keep First"], ["keep_last", "Keep Last"], ["skip", "Do Not Touch"]
+    ];
+    const KEY_DUP_OPTIONS = [
+      ["keep_first", "Keep First"], ["keep_last", "Keep Last"],
+      ["drop_all", "Delete All Duplicates"], ["skip", "Do Not Touch"]
+    ];
+
+    function translateLogMessage(msg) {
+      if (!msg) return msg;
+      return msg
+        .replace(/^Столбец\s+(['"].*?['"]):\s*(\d+)\s+пропусков\s+заполнено\s+медианой\s*\((.*?)\)/i, "Column $1: $2 missing values imputed with median ($3)")
+        .replace(/^Столбец\s+(['"].*?['"]):\s*(\d+)\s+пропусков\s+заполнено\s+средним\s*\((.*?)\)/i, "Column $1: $2 missing values imputed with mean ($3)")
+        .replace(/^Столбец\s+(['"].*?['"]):\s*(\d+)\s+пропусков\s+заполнено\s+модой\s*\((.*?)\)/i, "Column $1: $2 missing values imputed with mode ($3)")
+        .replace(/^Столбец\s+(['"].*?['"]):\s*(\d+)\s+пропусков\s+заполнено\s+(.*)/i, "Column $1: $2 missing values filled with $3")
+        .replace(/^Полных\s+дубликатов\s+строк\s+обработано:\s*(\d+)/i, "Full duplicate rows processed: $1")
+        .replace(/^Дубликатов\s+по\s+ключу\s+(['"].*?['"])\s+обработано:\s*(\d+)/i, "Key duplicates ($1) processed: $2")
+        .replace(/^Удалено\s+строк\s+с\s+выбросами:\s*(\d+)/i, "Rows with outliers dropped: $1")
+        .replace(/^Отрицательные\s+значения\s+в\s+столбце\s+(['"].*?['"]):\s*(\d+)/i, "Negative values in column $1: $2");
+    }
+
+    async function selectFile() {
+      if (window.pywebview && window.pywebview.api) {
+        const res = await window.pywebview.api.select_and_analyze();
+        if (res) updateUI(res);
+      }
+    }
+
+    async function runQuickClean() {
+      const btn = document.getElementById('quickCleanBtn');
+      btn.disabled = true;
+      btn.innerText = 'Processing...';
+
+      try {
+        const res = await window.pywebview.api.quick_clean();
+        btn.disabled = false;
+        btn.innerText = 'Quick Clean';
+
+        if (!res) {
+          alert('Cleaning returned no result. Check if a file is loaded.');
+          return;
+        }
+
+        updateUI({ file_name: document.getElementById('fileName').innerText, metrics: res.metrics, table: res.table });
+        showLog(res.log);
+        document.getElementById('logPanel').scrollIntoView({ behavior: 'smooth' });
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = 'Quick Clean';
+        console.error('quick_clean failed:', err);
+        alert('Error during cleaning: ' + err);
+      }
+    }
+
+    function updateUI(data) {
+      document.getElementById('fileName').innerText = data.file_name;
+
+      const keys = ['total_rows', 'total_cols', 'total_missing', 'duplicate_rows',
+                    'invalid_dates', 'logical_date_errors', 'negative_values', 'potential_outliers'];
+
+      keys.forEach(key => {
+        const el = document.getElementById(key);
+        const val = data.metrics[key];
+        el.innerText = val;
+        if (key !== 'total_rows' && key !== 'total_cols') {
+          el.className = 'metric-value ' + (val > 0 ? 'has-issues' : 'no-issues');
+        }
+      });
+
+      const bar = document.getElementById('statusBar');
+      if (data.metrics.is_clean) {
+        bar.innerText = "DATA IS CLEAN";
+        bar.className = "status-bar status-clean";
+      } else {
+        bar.innerText = `CLEANING REQUIRED (${data.metrics.total_issues} ERRORS)`;
+        bar.className = "status-bar status-error";
+      }
+
+      if (data.table) {
+        renderTable(data.table);
+      }
+
+      document.getElementById('cleanBtn').style.display = 'inline-block';
+      document.getElementById('quickCleanBtn').style.display = 'inline-block';
+    }
+
+    function resetUI() {
+      document.getElementById('fileName').innerText = 'No file selected';
+
+      const keys = ['total_rows', 'total_cols', 'total_missing', 'duplicate_rows',
+                    'invalid_dates', 'logical_date_errors', 'negative_values', 'potential_outliers'];
+
+      keys.forEach(key => {
+        const el = document.getElementById(key);
+        el.innerText = '-';
+        el.className = 'metric-value';
+      });
+
+      const bar = document.getElementById('statusBar');
+      bar.innerText = "WAITING FOR FILE";
+      bar.className = "status-bar";
+
+      document.getElementById('tableWrap').style.display = 'none';
+      document.getElementById('dataTable').innerHTML = '';
+
+      currentTableData = null;
+      errorsOnlyMode = false;
+      activeCategory = null;
+      currentLog = [];
+
+      document.querySelectorAll('.metric-card[data-category]').forEach(c => c.classList.remove('active'));
+      document.getElementById('errorsOnlyBtn').classList.remove('active');
+
+      document.getElementById('cleanBtn').style.display = 'none';
+      document.getElementById('quickCleanBtn').style.display = 'none';
+      document.getElementById('logPanel').classList.remove('open');
+      cleanConfig = null;
+    }
+
+    /* Modal & Clean Logic */
+    async function openCleanModal() {
+      if (!window.pywebview || !window.pywebview.api) return;
+      cleanConfig = await window.pywebview.api.get_clean_config(cleanMode);
+      if (!cleanConfig) return;
+      document.getElementById('cleanModal').classList.add('open');
+      renderCleanRules();
+    }
+
+    function closeCleanModal() {
+      document.getElementById('cleanModal').classList.remove('open');
+    }
+
+    async function switchMode(mode) {
+      cleanMode = mode;
+      document.getElementById('modeSimpleBtn').classList.toggle('active', mode === 'simple');
+      document.getElementById('modeSmartBtn').classList.toggle('active', mode === 'smart');
+      cleanConfig = await window.pywebview.api.get_clean_config(mode);
+      renderCleanRules();
+    }
+
+    function renderCleanRules() {
+      const body = document.getElementById('cleanRulesBody');
+      let html = '';
+
+      html += '<div class="rule-group"><div class="rule-group-title">Pre-processing</div>';
+      html += `<div class="rule-row"><span>Pseudo-missing ("N/A","-","null")</span>
+        <select onchange="cleanConfig.pseudo_missing.action=this.value">
+          <option value="to_nan" ${cleanConfig.pseudo_missing.action==='to_nan'?'selected':''}>Replace with NaN</option>
+          <option value="skip" ${cleanConfig.pseudo_missing.action==='skip'?'selected':''}>Do Not Touch</option>
+        </select></div>`;
+      html += `<div class="rule-row"><span>Whitespace trimming</span><span class="rule-note">auto trim()</span></div>`;
+      html += '</div>';
+
+      html += '<div class="rule-group"><div class="rule-group-title">Column Missing Values</div>';
+      for (const col in cleanConfig.missing) {
+        const rule = cleanConfig.missing[col];
+        const isNum = ['median_group', 'median', 'mean', 'zero'].includes(rule.action);
+        const options = isNum ? MISSING_NUM_OPTIONS : MISSING_TEXT_OPTIONS;
+
+        let extra = '';
+        if (rule.action === 'median_group') {
+          extra = ` <span class="rule-note">(group: ${rule.group_col}, η²=${rule.score})</span>`;
+        }
+
+        html += `<div class="rule-row"><span>${col}${extra}</span>
+          <select onchange="cleanConfig.missing['${col}'].action=this.value">
+            ${rule.action === 'median_group' ? `<option value="median_group" selected>Group Median</option>` : ''}
+            ${options.map(([v,l]) => `<option value="${v}" ${rule.action===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>`;
+      }
+      html += '</div>';
+
+      html += '<div class="rule-group"><div class="rule-group-title">Negative Values</div>';
+      for (const col in cleanConfig.negatives) {
+        const rule = cleanConfig.negatives[col];
+        html += `<div class="rule-row"><span>${col}</span>
+          <select onchange="cleanConfig.negatives['${col}'].action=this.value">
+            ${NEGATIVE_OPTIONS.map(([v,l]) => `<option value="${v}" ${rule.action===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>`;
+      }
+      html += '</div>';
+
+      html += '<div class="rule-group"><div class="rule-group-title">Outliers (IQR)</div>';
+      for (const col in cleanConfig.outliers) {
+        const rule = cleanConfig.outliers[col];
+        html += `<div class="rule-row"><span>${col}</span>
+          <select onchange="cleanConfig.outliers['${col}'].action=this.value">
+            ${OUTLIER_OPTIONS.map(([v,l]) => `<option value="${v}" ${rule.action===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>`;
+      }
+      html += '</div>';
+
+      html += '<div class="rule-group"><div class="rule-group-title">Duplicate Rows</div>';
+      html += `<div class="rule-row"><span>Full Duplicates</span>
+        <select onchange="cleanConfig.duplicate_rows.action=this.value">
+          ${DUP_OPTIONS.map(([v,l]) => `<option value="${v}" ${cleanConfig.duplicate_rows.action===v?'selected':''}>${l}</option>`).join('')}
+        </select></div>`;
+      for (const col in cleanConfig.key_duplicates) {
+        const rule = cleanConfig.key_duplicates[col];
+        html += `<div class="rule-row"><span>Key: ${col}</span>
+          <select onchange="cleanConfig.key_duplicates['${col}'].action=this.value">
+            ${KEY_DUP_OPTIONS.map(([v,l]) => `<option value="${v}" ${rule.action===v?'selected':''}>${l}</option>`).join('')}
+          </select></div>`;
+      }
+      html += '</div>';
+
+      body.innerHTML = html;
+    }
+
+    async function applyClean() {
+      if (!window.pywebview || !window.pywebview.api) return;
+      const res = await window.pywebview.api.preview_clean(cleanConfig);
+      if (!res) return;
+      closeCleanModal();
+      updateUI({ file_name: document.getElementById('fileName').innerText, metrics: res.metrics, table: res.table });
+      showLog(res.log);
+    }
+
+    function showLog(log) {
+      currentLog = (log || []).map(translateLogMessage);
+      const panel = document.getElementById('logPanel');
+      const list = document.getElementById('logList');
+      document.getElementById('logSummary').innerText = `Changes applied: ${currentLog.length}`;
+      list.innerHTML = currentLog.length ? currentLog.map(l => `<div>${l}</div>`).join('') : '<div>No changes required</div>';
+      panel.classList.add('open');
+    }
+
+    async function undoClean() {
+      if (window.pywebview && window.pywebview.api) {
+        const res = await window.pywebview.api.undo_clean();
+        if (res) {
+          updateUI(res);
+          document.getElementById('logPanel').classList.remove('open');
+        }
+      }
+    }
+
+    function saveLog() {
+      if (!currentLog.length) return;
+      const blob = new Blob([currentLog.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'cleaning_log.txt';
+      a.click();
+    }
+
+    function toggleSaveMenu() {
+      document.getElementById('saveDropdown').classList.toggle('open');
+    }
+
+    async function saveCleaned(format) {
+      document.getElementById('saveDropdown').classList.remove('open');
+      if (window.pywebview && window.pywebview.api) {
+        await window.pywebview.api.save_cleaned_file(format);
+      }
+    }
+
+    /* Table Render Logic */
+    function filterByCategory(category) {
+      activeCategory = (activeCategory === category) ? null : category;
+      document.querySelectorAll('.metric-card[data-category]').forEach(card => {
+        card.classList.toggle('active', card.dataset.category === activeCategory);
+      });
+      if (activeCategory) {
+        errorsOnlyMode = true;
+        document.getElementById('errorsOnlyBtn').classList.add('active');
+      }
+      drawTable();
+    }
+
+    function colLetter(n) {
+      let letters = '';
+      n += 1;
+      while (n > 0) {
+        const rem = (n - 1) % 26;
+        letters = String.fromCharCode(65 + rem) + letters;
+        n = Math.floor((n - 1) / 26);
+      }
+      return letters;
+    }
+
+    function renderTable(tableData) {
+      currentTableData = tableData;
+      errorsOnlyMode = false;
+      activeCategory = null;
+      document.querySelectorAll('.metric-card[data-category]').forEach(c => c.classList.remove('active'));
+      document.getElementById('errorsOnlyBtn').classList.remove('active');
+      drawTable();
+    }
+
+    function drawTable() {
+      const wrap = document.getElementById('tableWrap');
+      const table = document.getElementById('dataTable');
+      const info = document.getElementById('tableInfo');
+
+      if (!currentTableData || !currentTableData.rows || !currentTableData.rows.length) {
+        wrap.style.display = 'none';
+        return;
+      }
+
+      const { columns, rows } = currentTableData;
+
+      let visibleRows = rows;
+      if (activeCategory) {
+        visibleRows = rows.filter(r => r.categories && r.categories.includes(activeCategory));
+      } else if (errorsOnlyMode) {
+        visibleRows = rows.filter(r => r.has_error);
+      }
+
+      let html = '<thead>';
+      html += '<tr class="row-letters"><th class="corner"></th>' +
+              columns.map((_, i) => `<th>${colLetter(i)}</th>`).join('') + '</tr>';
+      html += '<tr class="row-headers"><th class="row-num-header">#</th>' +
+              columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+      html += '</thead><tbody>';
+
+      visibleRows.forEach(row => {
+        const realRowNum = rows.indexOf(row) + 1;
+        const rowClass = row.has_error ? ' class="error-row"' : '';
+        html += `<tr${rowClass}><td class="row-num">${realRowNum}</td>`;
+        columns.forEach(c => {
+          const cell = row.cells[c];
+          if (cell && cell.error) {
+            const safeReason = (cell.reason || '').replace(/"/g, '&quot;');
+            html += `<td class="error-cell" data-tooltip="${safeReason}">${cell.value}</td>`;
+          } else {
+            html += `<td>${cell ? cell.value : ''}</td>`;
+          }
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody>';
+      table.innerHTML = html;
+
+      const errorCount = rows.filter(r => r.has_error).length;
+      if (activeCategory) {
+        info.innerText = `Filter [${activeCategory}]: showing ${visibleRows.length} of ${rows.length} rows`;
+      } else if (errorsOnlyMode) {
+        info.innerText = `Showing error rows only: ${visibleRows.length} of ${rows.length}`;
+      } else {
+        info.innerText = `${rows.length} rows — errors: ${errorCount}`;
+      }
+
+      wrap.style.display = 'block';
+    }
+
+    function toggleErrorsOnly() {
+      errorsOnlyMode = !errorsOnlyMode;
+      activeCategory = null;
+      document.querySelectorAll('.metric-card[data-category]').forEach(c => c.classList.remove('active'));
+      document.getElementById('errorsOnlyBtn').classList.toggle('active', errorsOnlyMode);
+      drawTable();
+    }
+  </script>
+</body>
+</html>
